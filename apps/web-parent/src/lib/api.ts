@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL ?? 'http://localhost:3002';
@@ -7,7 +7,7 @@ export const api = axios.create({ baseURL: `${API_URL}/api/v1` });
 export const authApi = axios.create({ baseURL: `${AUTH_URL}/api/v1/auth` });
 export const authServiceApi = axios.create({ baseURL: `${AUTH_URL}/api/v1` });
 
-const attachToken = (config: Parameters<Parameters<typeof api.interceptors.request.use>[0]>[0]) => {
+const attachToken = (config: InternalAxiosRequestConfig) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;

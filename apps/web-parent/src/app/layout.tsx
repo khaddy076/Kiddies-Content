@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { Toaster } from 'sonner';
+import dynamic from 'next/dynamic';
 import './globals.css';
+
+const Toaster = dynamic(() => import('sonner').then((m) => m.Toaster), { ssr: false });
 
 const inter = Inter({ subsets: ['latin'] });
 

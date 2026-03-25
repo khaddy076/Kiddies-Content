@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { parentApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ interface VideoResult {
   description?: string;
 }
 
-export default function ContentSearchPage() {
+function ContentSearchPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const childId = searchParams.get('childId') ?? '';
@@ -213,5 +213,13 @@ export default function ContentSearchPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ContentSearchPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+      <ContentSearchPage />
+    </Suspense>
   );
 }
