@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: kiddies-auth
+    env: node
+    plan: free
+    rootDir: services/auth
+    buildCommand: cd ../.. && npm install && npx turbo run build --filter=@kiddies/auth
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3002
+      - key: AUTH_PORT
+        value: 3002
+      - key: JWT_SECRET
+        value: 2416debdb3e94be6b7928a035b03202ca497500f71bc7496b460e3cd84101f81
+      - key: ENCRYPTION_KEY
+        value: b2a4dca8fec88060586330027ab6020c52d4e445f9a5a2ca8f9bf3026947443b
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+  - type: web
+    name: kiddies-api
+    env: node
+    plan: free
+    rootDir: services/api
+    buildCommand: cd ../.. && npm install && npx turbo run build --filter=@kiddies/api
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: API_PORT
+        value: 3001
+      - key: JWT_SECRET
+        value: 2416debdb3e94be6b7928a035b03202ca497500f71bc7496b460e3cd84101f81
+      - key: ENCRYPTION_KEY
+        value: b2a4dca8fec88060586330027ab6020c52d4e445f9a5a2ca8f9bf3026947443b
+      - key: YOUTUBE_API_KEY
+        value: AIzaSyCiEVUi9XrGl8RZwsSuZTjSmmkwBVYfg4E
+      - key: AI_SAFETY_SCORE_THRESHOLD
+        value: 0.7
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: AUTH_URL
+        sync: false
