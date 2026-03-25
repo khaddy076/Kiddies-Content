@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../db.js';
 import { contentItems } from '@kiddies/db';
-import { requireParent, requireAuth } from '../middleware/auth.ts';
+import { requireParent, requireAuth } from '../middleware/auth.js';
 import { YouTubeClient } from '@kiddies/youtube-client';
 import { config } from '../config.js';
 
@@ -88,7 +88,7 @@ export async function contentRoutes(fastify: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     const body = req.body as { reason?: string };
 
-    fastify.log.warn({ contentId: id, reportedBy: req.user.id, reason: body.reason }, 'Content flagged');
+    fastify.log.warn({ contentId: id, reportedBy: req.authUser.id, reason: body.reason }, 'Content flagged');
 
     return reply.send({ success: true, data: { message: 'Content flagged for review. Thank you for helping keep kids safe.' } });
   });

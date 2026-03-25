@@ -5,7 +5,7 @@ import {
   contentItems, approvedContent, contentRequests, watchSessions,
   recommendations, childProfiles, childContentFilters, users,
 } from '@kiddies/db';
-import { requireChild } from '../middleware/auth.ts';
+import { requireChild } from '../middleware/auth.js';
 import { notificationQueue } from '../queues/index.js';
 import { YouTubeClient } from '@kiddies/youtube-client';
 import { getRemainingScreenTime } from '../utils/screentime.js';
@@ -17,7 +17,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   // ── Browse & Discover ─────────────────────────────────────────────────────
   fastify.get('/browse', { preHandler: [requireChild] }, async (req, reply) => {
     const query = req.query as { page?: string; limit?: string; category?: string };
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     const page = parseInt(query.page ?? '1');
     const limit = parseInt(query.limit ?? '20');
     const offset = (page - 1) * limit;
@@ -63,7 +63,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.get('/browse/search', { preHandler: [requireChild] }, async (req, reply) => {
     const query = req.query as { q?: string };
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     if (!query.q || query.q.length < 2) {
       return reply.status(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Query must be at least 2 characters' } });
     }
@@ -92,7 +92,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.get('/library', { preHandler: [requireChild] }, async (req, reply) => {
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     const items = await db.select({
       id: contentItems.id,
       title: contentItems.title,
@@ -117,7 +117,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.get('/recommendations', { preHandler: [requireChild] }, async (req, reply) => {
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     const recs = await db.select({
       id: recommendations.id,
       score: recommendations.score,
@@ -157,8 +157,8 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
       return reply.status(400).send({ success: false, error: { code: 'VALIDATION_ERROR', message: 'youtubeVideoId required' } });
     }
 
-    const childId = req.user.id;
-    const parentId = req.user.parentId;
+    const childId = req.authUser.id;
+    const parentId = req.authUser.parentId;
     if (!parentId) return reply.status(400).send({ success: false, error: { code: 'NO_PARENT', message: 'No parent associated' } });
 
     // Check for duplicate pending request
@@ -222,7 +222,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.get('/requests', { preHandler: [requireChild] }, async (req, reply) => {
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     const requests = await db.select({
       id: contentRequests.id,
       status: contentRequests.status,
@@ -247,7 +247,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   // ── Watch / Playback ───────────────────────────────────────────────────────
   fastify.get('/watch/:contentId', { preHandler: [requireChild] }, async (req, reply) => {
     const { contentId } = req.params as { contentId: string };
-    const childId = req.user.id;
+    const childId = req.authUser.id;
 
     // Verify approved
     const [approved] = await db.select().from(approvedContent)
@@ -294,7 +294,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
 
   fastify.post('/watch/sessions', { preHandler: [requireChild] }, async (req, reply) => {
     const body = req.body as { contentId: string; deviceType?: string };
-    const childId = req.user.id;
+    const childId = req.authUser.id;
 
     const [approved] = await db.select({ id: approvedContent.id }).from(approvedContent)
       .where(and(eq(approvedContent.childId, childId), eq(approvedContent.contentId, body.contentId)));
@@ -312,7 +312,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.put('/watch/sessions/:sessionId/heartbeat', { preHandler: [requireChild] }, async (req, reply) => {
     const { sessionId } = req.params as { sessionId: string };
     const body = req.body as { watchSeconds: number };
-    const childId = req.user.id;
+    const childId = req.authUser.id;
 
     await db.update(watchSessions).set({ watchSeconds: body.watchSeconds })
       .where(and(eq(watchSessions.id, sessionId), eq(watchSessions.childId, childId)));
@@ -331,7 +331,7 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/watch/sessions/:sessionId/end', { preHandler: [requireChild] }, async (req, reply) => {
     const { sessionId } = req.params as { sessionId: string };
     const body = req.body as { watchSeconds: number };
-    const childId = req.user.id;
+    const childId = req.authUser.id;
 
     await db.update(watchSessions).set({
       endedAt: new Date(),
@@ -343,14 +343,14 @@ export async function childRoutes(fastify: FastifyInstance): Promise<void> {
 
   // ── Screen Time ────────────────────────────────────────────────────────────
   fastify.get('/screen-time/today', { preHandler: [requireChild] }, async (req, reply) => {
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     const summary = await getRemainingScreenTime(childId, db);
     return reply.send({ success: true, data: summary });
   });
 
   // ── Profile ────────────────────────────────────────────────────────────────
   fastify.get('/profile', { preHandler: [requireChild] }, async (req, reply) => {
-    const childId = req.user.id;
+    const childId = req.authUser.id;
     const [profile] = await db.select({
       id: users.id,
       displayName: users.displayName,

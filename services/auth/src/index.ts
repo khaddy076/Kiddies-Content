@@ -9,12 +9,9 @@ import { parentAuthRoutes } from './routes/parent-auth.routes.js';
 import { childAuthRoutes } from './routes/child-auth.routes.js';
 
 const fastify = Fastify({
-  logger: {
-    level: config.NODE_ENV === 'production' ? 'warn' : 'info',
-    transport: config.NODE_ENV !== 'production'
-      ? { target: 'pino-pretty', options: { colorize: true } }
-      : undefined,
-  },
+  logger: config.NODE_ENV !== 'production'
+    ? { level: 'info' as const, transport: { target: 'pino-pretty', options: { colorize: true } } }
+    : { level: 'warn' as const },
 });
 
 async function buildApp() {

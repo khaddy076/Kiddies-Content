@@ -129,7 +129,7 @@ export async function childAuthRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     const { displayName, dateOfBirth, pin, screenTimeLimitMinutes } = result.data;
-    const parentId = request.user.id;
+    const parentId = request.authUser.id;
 
     // Compute age group from date of birth
     const birthYear = new Date(dateOfBirth).getFullYear();
@@ -179,7 +179,7 @@ export async function childAuthRoutes(fastify: FastifyInstance): Promise<void> {
     }
 
     const { childId } = request.params as { childId: string };
-    const parentId = request.user.id;
+    const parentId = request.authUser.id;
 
     // Verify parent owns child
     const [child] = await db.select().from(users)

@@ -7,7 +7,7 @@ import {
   approvedContent, watchSessions, childContentFilters, screenTimeSchedules,
   notifications, platformConnections,
 } from '@kiddies/db';
-import { requireParent, requireParentOfChild } from '../middleware/auth.ts';
+import { requireParent, requireParentOfChild } from '../middleware/auth.js';
 import { notificationQueue, recommendationQueue } from '../queues/index.js';
 import { YouTubeClient } from '@kiddies/youtube-client';
 import { config } from '../config.js';
@@ -19,8 +19,8 @@ const yt = new YouTubeClient({ apiKey: config.YOUTUBE_API_KEY });
 export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
   // ── Profile ──────────────────────────────────────────────────────────────
   fastify.get('/profile', { preHandler: [requireParent] }, async (req, reply) => {
-    const [profile] = await db.select().from(parentProfiles).where(eq(parentProfiles.userId, req.user.id));
-    const [user] = await db.select({ id: users.id, email: users.email, displayName: users.displayName, phone: users.phone, avatarUrl: users.avatarUrl, isVerified: users.isVerified }).from(users).where(eq(users.id, req.user.id));
+    const [profile] = await db.select().from(parentProfiles).where(eq(parentProfiles.userId, req.authUser.id));
+    const [user] = await db.select({ id: users.id, email: users.email, displayName: users.displayName, phone: users.phone, avatarUrl: users.avatarUrl, isVerified: users.isVerified }).from(users).where(eq(users.id, req.authUser.id));
     return reply.send({ success: true, data: { ...user, profile } });
   });
 
@@ -32,11 +32,11 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
       if (key in body) updates[key] = body[key];
     }
     if (Object.keys(updates).length > 0) {
-      await db.update(parentProfiles).set({ ...updates, updatedAt: new Date() }).where(eq(parentProfiles.userId, req.user.id));
+      await db.update(parentProfiles).set({ ...updates, updatedAt: new Date() }).where(eq(parentProfiles.userId, req.authUser.id));
     }
     // Update display name if provided
     if (body['displayName']) {
-      await db.update(users).set({ displayName: body['displayName'] as string, updatedAt: new Date() }).where(eq(users.id, req.user.id));
+      await db.update(users).set({ displayName: body['displayName'] as string, updatedAt: new Date() }).where(eq(users.id, req.authUser.id));
     }
     return reply.send({ success: true, data: { message: 'Profile updated' } });
   });
@@ -54,7 +54,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
       isCoppaSubject: childProfiles.isCoppaSubject,
     }).from(users)
       .innerJoin(childProfiles, eq(childProfiles.userId, users.id))
-      .where(eq(childProfiles.parentId, req.user.id));
+      .where(eq(childProfiles.parentId, req.authUser.id));
 
     // Add today's screen time for each child
     const childrenWithTime = await Promise.all(
@@ -126,7 +126,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
     const limit = parseInt(query.limit ?? '20');
     const offset = (page - 1) * limit;
 
-    const conditions = [eq(contentRequests.parentId, req.user.id)];
+    const conditions = [eq(contentRequests.parentId, req.authUser.id)];
     if (query.status && ['pending', 'approved', 'denied', 'expired'].includes(query.status)) {
       conditions.push(eq(contentRequests.status, query.status as 'pending' | 'approved' | 'denied' | 'expired'));
     }
@@ -198,7 +198,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
       .from(contentRequests)
       .innerJoin(contentItems, eq(contentItems.id, contentRequests.contentId))
       .innerJoin(users, eq(users.id, contentRequests.childId))
-      .where(and(eq(contentRequests.id, id), eq(contentRequests.parentId, req.user.id)));
+      .where(and(eq(contentRequests.id, id), eq(contentRequests.parentId, req.authUser.id)));
 
     if (!request) return reply.status(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Request not found' } });
     return reply.send({ success: true, data: request });
@@ -209,7 +209,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
     const body = req.body as { note?: string } | undefined;
 
     const [request] = await db.select().from(contentRequests)
-      .where(and(eq(contentRequests.id, id), eq(contentRequests.parentId, req.user.id), eq(contentRequests.status, 'pending')));
+      .where(and(eq(contentRequests.id, id), eq(contentRequests.parentId, req.authUser.id), eq(contentRequests.status, 'pending')));
 
     if (!request) return reply.status(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Pending request not found' } });
 
@@ -223,7 +223,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
       await tx.insert(approvedContent).values({
         childId: request.childId,
         contentId: request.contentId,
-        approvedBy: req.user.id,
+        approvedBy: req.authUser.id,
       }).onConflictDoNothing();
     });
 
@@ -244,7 +244,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
     const body = req.body as { note?: string };
 
     const [request] = await db.select().from(contentRequests)
-      .where(and(eq(contentRequests.id, id), eq(contentRequests.parentId, req.user.id), eq(contentRequests.status, 'pending')));
+      .where(and(eq(contentRequests.id, id), eq(contentRequests.parentId, req.authUser.id), eq(contentRequests.status, 'pending')));
 
     if (!request) return reply.status(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Pending request not found' } });
 
@@ -275,7 +275,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Verify child belongs to parent
     const [profile] = await db.select().from(childProfiles)
-      .where(and(eq(childProfiles.userId, body.childId), eq(childProfiles.parentId, req.user.id)));
+      .where(and(eq(childProfiles.userId, body.childId), eq(childProfiles.parentId, req.authUser.id)));
     if (!profile) return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Child not found' } });
 
     // Fetch or get cached content
@@ -326,7 +326,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
     await db.insert(approvedContent).values({
       childId: body.childId,
       contentId: item.id,
-      approvedBy: req.user.id,
+      approvedBy: req.authUser.id,
     }).onConflictDoNothing();
 
     return reply.send({ success: true, data: { message: 'Content pre-approved', content: item } });
@@ -392,7 +392,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
       childId,
       filterType: body.filterType as 'block_category' | 'block_channel' | 'block_tag' | 'require_min_rating',
       filterValue: body.filterValue,
-      createdBy: req.user.id,
+      createdBy: req.authUser.id,
     }).onConflictDoNothing().returning();
     return reply.status(201).send({ success: true, data: filter });
   });
@@ -420,7 +420,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
     await db.delete(screenTimeSchedules).where(eq(screenTimeSchedules.childId, childId));
     if (body.length > 0) {
       await db.insert(screenTimeSchedules).values(
-        body.map((s) => ({ childId, dayOfWeek: s.dayOfWeek, allowedStart: s.allowedStart, allowedEnd: s.allowedEnd, createdBy: req.user.id })),
+        body.map((s) => ({ childId, dayOfWeek: s.dayOfWeek, allowedStart: s.allowedStart, allowedEnd: s.allowedEnd, createdBy: req.authUser.id })),
       );
     }
     return reply.send({ success: true, data: { message: 'Schedule updated' } });
@@ -428,7 +428,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
 
   // ── Emergency Controls ────────────────────────────────────────────────────
   fastify.post('/children/pause-all', { preHandler: [requireParent] }, async (req, reply) => {
-    const children = await db.select({ userId: childProfiles.userId }).from(childProfiles).where(eq(childProfiles.parentId, req.user.id));
+    const children = await db.select({ userId: childProfiles.userId }).from(childProfiles).where(eq(childProfiles.parentId, req.authUser.id));
     const childIds = children.map((c) => c.userId);
     if (childIds.length > 0) {
       await db.update(users).set({ isActive: false }).where(inArray(users.id, childIds));
@@ -437,7 +437,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.post('/children/resume-all', { preHandler: [requireParent] }, async (req, reply) => {
-    const children = await db.select({ userId: childProfiles.userId }).from(childProfiles).where(eq(childProfiles.parentId, req.user.id));
+    const children = await db.select({ userId: childProfiles.userId }).from(childProfiles).where(eq(childProfiles.parentId, req.authUser.id));
     const childIds = children.map((c) => c.userId);
     if (childIds.length > 0) {
       await db.update(users).set({ isActive: true }).where(inArray(users.id, childIds));
@@ -502,12 +502,12 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
   // ── Notifications ─────────────────────────────────────────────────────────
   fastify.get('/notifications', { preHandler: [requireParent] }, async (req, reply) => {
     const items = await db.select().from(notifications)
-      .where(eq(notifications.userId, req.user.id))
+      .where(eq(notifications.userId, req.authUser.id))
       .orderBy(desc(notifications.createdAt))
       .limit(50);
 
     const [{ unread }] = await db.select({ unread: sql<number>`count(*)` }).from(notifications)
-      .where(and(eq(notifications.userId, req.user.id), eq(notifications.isRead, false)));
+      .where(and(eq(notifications.userId, req.authUser.id), eq(notifications.isRead, false)));
 
     return reply.send({ success: true, data: { notifications: items, unreadCount: Number(unread) } });
   });
@@ -515,13 +515,13 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.put('/notifications/:id/read', { preHandler: [requireParent] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     await db.update(notifications).set({ isRead: true, readAt: new Date() })
-      .where(and(eq(notifications.id, id), eq(notifications.userId, req.user.id)));
+      .where(and(eq(notifications.id, id), eq(notifications.userId, req.authUser.id)));
     return reply.send({ success: true, data: { message: 'Marked as read' } });
   });
 
   fastify.put('/notifications/read-all', { preHandler: [requireParent] }, async (req, reply) => {
     await db.update(notifications).set({ isRead: true, readAt: new Date() })
-      .where(and(eq(notifications.userId, req.user.id), eq(notifications.isRead, false)));
+      .where(and(eq(notifications.userId, req.authUser.id), eq(notifications.isRead, false)));
     return reply.send({ success: true, data: { message: 'All notifications marked as read' } });
   });
 
@@ -533,7 +533,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
       platformUserId: platformConnections.platformUserId,
       isActive: platformConnections.isActive,
       createdAt: platformConnections.createdAt,
-    }).from(platformConnections).where(eq(platformConnections.parentId, req.user.id));
+    }).from(platformConnections).where(eq(platformConnections.parentId, req.authUser.id));
     return reply.send({ success: true, data: connections });
   });
 
@@ -541,7 +541,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
     if (!config.YOUTUBE_OAUTH_CLIENT_ID) {
       return reply.status(501).send({ success: false, error: { code: 'NOT_CONFIGURED', message: 'YouTube OAuth not configured' } });
     }
-    const state = Buffer.from(JSON.stringify({ userId: req.user.id })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ userId: req.authUser.id })).toString('base64');
     const url = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${config.YOUTUBE_OAUTH_CLIENT_ID}&` +
       `redirect_uri=${encodeURIComponent(config.YOUTUBE_OAUTH_REDIRECT_URI)}&` +
@@ -599,7 +599,7 @@ export async function parentRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.delete('/platforms/:platform', { preHandler: [requireParent] }, async (req, reply) => {
     const { platform } = req.params as { platform: string };
     await db.update(platformConnections).set({ isActive: false })
-      .where(and(eq(platformConnections.parentId, req.user.id), eq(platformConnections.platform, platform as 'youtube')));
+      .where(and(eq(platformConnections.parentId, req.authUser.id), eq(platformConnections.platform, platform as 'youtube')));
     return reply.send({ success: true, data: { message: 'Platform disconnected' } });
   });
 }

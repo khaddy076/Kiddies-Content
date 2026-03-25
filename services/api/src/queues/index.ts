@@ -1,7 +1,8 @@
 import { Queue } from 'bullmq';
+import type { ConnectionOptions } from 'bullmq';
 import { redis } from '../redis.js';
 
-const connection = redis;
+const connection = redis as unknown as ConnectionOptions;
 
 export const notificationQueue = new Queue('notification', { connection });
 export const recommendationQueue = new Queue('recommendation', { connection });

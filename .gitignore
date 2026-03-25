@@ -14,3 +14,4 @@ keys/
 coverage/
 .DS_Store
 *.log
+.vercel
