@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+build/
+.env
+.env.local
+services/auth/.env
+services/api/.env
+services/recommendation/.env
+services/notification/.env
+*.pem
+keys/
+.turbo/
+coverage/
+.DS_Store
+*.log

@@ -1,0 +1,36 @@
+{
+  "name": "kiddies-content",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Parental content control middleware platform",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "db:generate": "turbo run db:generate --filter=@kiddies/db",
+    "db:migrate": "turbo run db:migrate --filter=@kiddies/db",
+    "db:studio": "turbo run db:studio --filter=@kiddies/db",
+    "docker:up": "docker-compose -f infrastructure/docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f infrastructure/docker/docker-compose.yml down",
+    "docker:logs": "docker-compose -f infrastructure/docker/docker-compose.yml logs -f"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^8.57.0",
+    "pino-pretty": "^13.1.3",
+    "prettier": "^3.2.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "packageManager": "npm@11.9.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

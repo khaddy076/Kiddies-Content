@@ -1,0 +1,21 @@
+{
+  "name": "@kiddies/ui",
+  "version": "1.0.0",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-native": "^0.74.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "~18.2.0"
+  }
+}

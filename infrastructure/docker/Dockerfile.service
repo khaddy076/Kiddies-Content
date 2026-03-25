@@ -1,0 +1,53 @@
+ARG SERVICE_DIR=services/api
+ARG SERVICE_PORT=3001
+
+# Stage 1: Install dependencies
+FROM node:20-alpine AS deps
+WORKDIR /app
+ARG SERVICE_DIR
+
+COPY package.json ./
+COPY turbo.json ./
+COPY tsconfig.base.json ./
+COPY packages/db/package.json ./packages/db/package.json
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/youtube-client/package.json ./packages/youtube-client/package.json
+COPY ${SERVICE_DIR}/package.json ./${SERVICE_DIR}/package.json
+
+RUN npm install --workspaces --include-workspace-root
+
+# Stage 2: Build
+FROM node:20-alpine AS builder
+WORKDIR /app
+ARG SERVICE_DIR
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
+COPY --from=deps /app/${SERVICE_DIR}/node_modules ./${SERVICE_DIR}/node_modules
+
+COPY tsconfig.base.json ./
+COPY packages/types ./packages/types
+COPY packages/db ./packages/db
+COPY packages/youtube-client ./packages/youtube-client
+COPY ${SERVICE_DIR} ./${SERVICE_DIR}
+
+RUN npm run build --workspace=packages/types
+RUN npm run build --workspace=packages/db
+RUN npm run build --workspace=packages/youtube-client
+RUN npm run build --workspace=${SERVICE_DIR}
+
+# Stage 3: Run
+FROM node:20-alpine AS runner
+WORKDIR /app
+ARG SERVICE_DIR
+ARG SERVICE_PORT
+ENV NODE_ENV=production
+
+COPY --from=builder /app/${SERVICE_DIR}/dist ./dist
+COPY --from=builder /app/${SERVICE_DIR}/node_modules ./node_modules
+COPY --from=builder /app/packages/types/dist ./node_modules/@kiddies/types/dist
+COPY --from=builder /app/packages/db/dist ./node_modules/@kiddies/db/dist
+COPY --from=builder /app/packages/youtube-client/dist ./node_modules/@kiddies/youtube-client/dist
+
+EXPOSE ${SERVICE_PORT}
+CMD ["node", "dist/index.js"]

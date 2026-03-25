@@ -1,0 +1,201 @@
+version: '3.9'
+
+networks:
+  kiddies_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+  # ── PostgreSQL with pgvector ───────────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: kiddies_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kiddies
+      POSTGRES_PASSWORD: kiddies_secret
+      POSTGRES_DB: kiddies_content
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kiddies -d kiddies_content"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kiddies_network
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: kiddies_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kiddies_network
+
+  # ── Auth Service ───────────────────────────────────────────────────────────
+  auth:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/auth
+        SERVICE_PORT: 3002
+    container_name: kiddies_auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kiddies:kiddies_secret@postgres:5432/kiddies_content
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_secure_secret_at_least_32_chars}
+      AUTH_PORT: 3002
+      NODE_ENV: ${NODE_ENV:-development}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Kiddies Content <noreply@kiddies-content.com>}
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://api:3001}
+    ports:
+      - "3002:3002"
+    networks:
+      - kiddies_network
+
+  # ── API Service ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/api
+        SERVICE_PORT: 3001
+    container_name: kiddies_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kiddies:kiddies_secret@postgres:5432/kiddies_content
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_secure_secret_at_least_32_chars}
+      API_PORT: 3001
+      NODE_ENV: ${NODE_ENV:-development}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      YOUTUBE_OAUTH_CLIENT_ID: ${YOUTUBE_OAUTH_CLIENT_ID:-}
+      YOUTUBE_OAUTH_CLIENT_SECRET: ${YOUTUBE_OAUTH_CLIENT_SECRET:-}
+      YOUTUBE_OAUTH_REDIRECT_URI: ${YOUTUBE_OAUTH_REDIRECT_URI:-http://localhost:3001/api/v1/parent/platforms/youtube/callback}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0000000000000000000000000000000000000000000000000000000000000000}
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
+      AI_SAFETY_SCORE_THRESHOLD: 0.7
+    ports:
+      - "3001:3001"
+    networks:
+      - kiddies_network
+
+  # ── Recommendation Worker ─────────────────────────────────────────────────
+  recommendation:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/recommendation
+        SERVICE_PORT: 0
+    container_name: kiddies_recommendation
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kiddies:kiddies_secret@postgres:5432/kiddies_content
+      REDIS_URL: redis://redis:6379
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      NODE_ENV: ${NODE_ENV:-development}
+    networks:
+      - kiddies_network
+
+  # ── Notification Worker ────────────────────────────────────────────────────
+  notification:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/notification
+        SERVICE_PORT: 0
+    container_name: kiddies_notification
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://kiddies:kiddies_secret@postgres:5432/kiddies_content
+      REDIS_URL: redis://redis:6379
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      NODE_ENV: ${NODE_ENV:-development}
+    networks:
+      - kiddies_network
+
+  # ── Web Parent Dashboard ───────────────────────────────────────────────────
+  web:
+    build:
+      context: ../../apps/web-parent
+      dockerfile: ../../infrastructure/docker/Dockerfile.web
+    container_name: kiddies_web
+    restart: unless-stopped
+    depends_on:
+      - api
+      - auth
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      NEXT_PUBLIC_AUTH_URL: ${NEXT_PUBLIC_AUTH_URL:-http://localhost:3002}
+    ports:
+      - "3000:3000"
+    networks:
+      - kiddies_network
+
+  # ── BullMQ Dashboard (Queue Monitor) ──────────────────────────────────────
+  bullboard:
+    image: deadly0/bull-board
+    container_name: kiddies_bullboard
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "3333:3333"
+    depends_on:
+      - redis
+    networks:
+      - kiddies_network

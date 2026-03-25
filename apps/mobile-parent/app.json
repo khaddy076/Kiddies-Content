@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Kiddies Parent",
+    "slug": "kiddies-parent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "kiddies-parent",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kiddies.parent",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Use Face ID to unlock the Kiddies Parent app"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6C63FF"
+      },
+      "package": "com.kiddies.parent",
+      "permissions": ["INTERNET", "USE_BIOMETRIC", "USE_FINGERPRINT"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-local-authentication",
+      ["expo-notifications", { "color": "#6C63FF" }]
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}
