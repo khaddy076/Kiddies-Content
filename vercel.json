@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npx turbo run build --filter=web-parent",
+  "outputDirectory": "apps/web-parent/.next",
+  "installCommand": "npm install",
+  "ignoreCommand": "npx turbo-ignore web-parent"
+}
